@@ -1,0 +1,29 @@
+
+---
+
+# 🧠 docs/architecture.md
+
+```md
+# 🏗️ Architecture Overview
+
+## Nodes
+
+| Role | IP |
+|------|----|
+| Load Balancer | 192.168.100.101 |
+| DNS Server (dnsmasq) | 192.168.100.102 |
+| Database Server | 192.168.100.103 |
+
+---
+
+## DNS Mapping
+
+- app1.lan → 192.168.100.102  
+- lb1.lan → 192.168.100.101  
+- db1.lan → 192.168.100.103  
+
+---
+
+## Traffic Flow
+
+Client → DNS Server → Service Resolution → Internal Routing

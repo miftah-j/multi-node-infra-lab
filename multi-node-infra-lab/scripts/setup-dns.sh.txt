@@ -1,0 +1,12 @@
+#!/bin/bash
+
+echo "[+] Installing dnsmasq..."
+sudo apt update && sudo apt install dnsmasq -y
+
+echo "[+] Deploying configuration..."
+sudo cp ../configs/dns/dnsmasq.conf /etc/dnsmasq.conf
+
+echo "[+] Restarting service..."
+sudo systemctl restart dnsmasq
+
+echo "[+] DNS setup complete"

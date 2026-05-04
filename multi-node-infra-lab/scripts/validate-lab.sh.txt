@@ -1,0 +1,10 @@
+#!/bin/bash
+
+echo "[+] Testing DNS resolution..."
+dig app1.lan @192.168.100.102
+
+echo "[+] Testing connectivity..."
+ping -c 2 192.168.100.102
+ping -c 2 app1.lan
+
+echo "[+] Validation complete"

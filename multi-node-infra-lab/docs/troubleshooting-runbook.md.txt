@@ -1,0 +1,358 @@
+----------
+
+# 🧪 Multi-Node Infrastructure Lab — Full Troubleshooting Runbook
+
+## 📌 Environment
+
+-   Load Balancer → `192.168.100.101`
+-   App Server (DNS - dnsmasq) → `192.168.100.102`
+-   Database Server → `192.168.100.103`
+-   Internal Domain → `*.lan`
+
+----------
+
+# 🚨 Scenario 1 — Firewall did not block ICMP as expected
+
+## ❌ Problem
+
+ICMP (ping) still worked despite firewall rule:
+
+```
+sudo ufw deny from 192.168.100.0/24
+```
+
+Test:
+
+```
+ping 192.168.100.102# SUCCESS (unexpected)
+```
+
+----------
+
+## 🔍 Troubleshooting Steps
+
+### 1. Check UFW status
+
+```
+sudo ufw status verbose
+```
+
+### 2. Inspect iptables ICMP rules
+
+```
+sudo iptables -L -n -v | grep icmp
+```
+
+### Observed:
+
+-   ACCEPT rules for ICMP (echo-request, echo-reply)
+-   DENY rule not effective for ICMP path
+
+----------
+
+## 🧠 Root Cause
+
+-   ICMP handled by existing ACCEPT rules
+-   Rule order precedence (ACCEPT before DENY)
+-   UFW abstraction did not override kernel-level rules
+
+----------
+
+## 🛠️ Fix
+
+### Force ICMP drop at iptables level
+
+```
+sudo iptables -I INPUT -s 192.168.100.0/24 -p icmp -j DROP
+```
+
+### Reload firewall
+
+```
+sudo ufw reload
+```
+
+----------
+
+## ✅ Validation
+
+```
+ping 192.168.100.102# FAILED (expected)
+```
+
+----------
+
+# 🚨 Scenario 2 — dnsmasq failed to start (Port 53 conflict)
+
+## ❌ Problem
+
+```
+failed to create listening socket for port 53: Address already in use
+```
+
+----------
+
+## 🔍 Troubleshooting Steps
+
+### Check service status
+
+```
+systemctl status dnsmasq
+```
+
+### Check port usage
+
+```
+sudo ss -tulnp | grep :53
+```
+
+### Found:
+
+-   `systemd-resolved` occupying port 53
+
+----------
+
+## 🛠️ Fix
+
+### Stop systemd-resolved
+
+```
+sudo systemctl stop systemd-resolvedsudo systemctl disable systemd-resolved
+```
+
+### Remove conflicting resolver
+
+```
+sudo rm /etc/resolv.confecho "nameserver 192.168.100.102" | sudo tee /etc/resolv.conf
+```
+
+----------
+
+## ✅ Result
+
+dnsmasq started successfully.
+
+----------
+
+# 🚨 Scenario 3 — DNS resolution failed from client nodes
+
+## ❌ Problem
+
+```
+ping app1.lan# Temporary failure in name resolution
+```
+
+----------
+
+## 🔍 Troubleshooting Steps
+
+### 1. Test DNS server directly
+
+```
+dig app1.lan @192.168.100.102
+```
+
+### 2. Check client resolver
+
+```
+cat /etc/resolv.conf
+```
+
+### Found:
+
+```
+nameserver 8.8.8.8
+```
+
+----------
+
+## 🧠 Root Cause
+
+-   Clients not using internal DNS
+-   dnsmasq records inconsistent
+
+----------
+
+## 🛠️ Fix — dnsmasq config (App Server)
+
+```
+sudo nano /etc/dnsmasq.conf
+```
+
+### Final working config:
+
+```
+interface=ens33bind-interfaceslisten-address=192.168.100.102address=/app1.lan/192.168.100.102address=/lb1.lan/192.168.100.101address=/db1.lan/192.168.100.103server=8.8.8.8server=1.1.1.1
+```
+
+### Restart service
+
+```
+sudo systemctl restart dnsmasq
+```
+
+----------
+
+### Fix client resolver (ALL nodes)
+
+```
+sudo rm -f /etc/resolv.confecho "nameserver 192.168.100.102" | sudo tee /etc/resolv.conf
+```
+
+----------
+
+## ✅ Result
+
+DNS resolution started working across nodes.
+
+----------
+
+# 🚨 Scenario 4 — DNS server unreachable from client (critical outage)
+
+## ❌ Problem
+
+```
+dig app1.lan @192.168.100.102# timeout
+```
+
+----------
+
+## 🔍 Troubleshooting Steps
+
+### 1. Test connectivity
+
+```
+ping 192.168.100.102
+```
+
+### 2. Check firewall rules
+
+```
+sudo ufw status verbose
+```
+
+### Found:
+
+-   Subnet-wide DENY rules
+-   Missing DNS allow rules
+
+----------
+
+## 🛠️ Fix
+
+### Remove incorrect rules
+
+```
+sudo ufw delete deny from 192.168.100.0/24sudo ufw delete deny from 192.168.100.101
+```
+
+### Allow DNS traffic
+
+```
+sudo ufw allow from 192.168.100.0/24 to any port 53 proto udpsudo ufw allow from 192.168.100.0/24 to any port 53 proto tcpsudo ufw reload
+```
+
+----------
+
+## ✅ Result
+
+DNS server reachable again from all nodes.
+
+----------
+
+# 🚨 Scenario 5 — DNS still failing after network fix
+
+## ❌ Problem
+
+Even after connectivity fix:
+
+```
+ping app1.lan# FAILED
+```
+
+----------
+
+## 🔍 Troubleshooting Steps
+
+### Check dnsmasq binding
+
+```
+sudo ss -tulnp | grep :53
+```
+
+### Check interface IP
+
+```
+ip a
+```
+
+### Found issue:
+
+-   dnsmasq not properly bound to LAN interface
+
+----------
+
+## 🛠️ Fix
+
+### Correct dnsmasq binding
+
+```
+interface=ens33bind-interfaceslisten-address=192.168.100.102
+```
+
+### Restart service
+
+```
+sudo systemctl restart dnsmasq
+```
+
+----------
+
+## ✅ Result
+
+DNS service fully exposed and functional.
+
+----------
+
+# 🧠 Final System Validation
+
+## Network
+
+```
+ping 192.168.100.101ping 192.168.100.102ping 192.168.100.103
+```
+
+## DNS
+
+```
+dig app1.lan @192.168.100.102
+```
+
+## Client resolution
+
+```
+ping app1.lanping db1.lan
+```
+
+----------
+
+# 🎯 Final Outcome
+
+✔ ICMP behavior controlled  
+✔ DNS fully centralized  
+✔ Firewall rules enforced correctly  
+✔ Multi-node communication stable  
+✔ Production-like lab achieved
+
+----------
+
+# 🚀 Engineering Insight
+
+This lab demonstrates real-world infra failure patterns:
+
+-   Layer 1: Network reachability
+-   Layer 2: Firewall policy correctness
+-   Layer 3: DNS service integrity
+-   Layer 4: Client resolver configuration
+
+> Most infra failures are not single-point issues — they are cascading misconfigurations across layers.

@@ -1,0 +1,7 @@
+#!/bin/bash
+
+echo "[+] Applying network config..."
+
+sudo netplan apply
+
+echo "[+] Network configured"

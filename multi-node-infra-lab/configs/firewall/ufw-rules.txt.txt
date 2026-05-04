@@ -1,0 +1,9 @@
+# Allow SSH
+22/tcp ALLOW IN
+
+# Allow DNS from internal network
+53/udp ALLOW FROM 192.168.100.0/24
+53/tcp ALLOW FROM 192.168.100.0/24
+
+# Block external unwanted access
+DENY FROM ANY

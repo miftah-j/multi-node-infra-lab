@@ -1,0 +1,12 @@
+#!/bin/bash
+
+echo "[+] Configuring UFW..."
+
+sudo ufw allow 22/tcp
+sudo ufw allow from 192.168.100.0/24 to any port 53 proto udp
+sudo ufw allow from 192.168.100.0/24 to any port 53 proto tcp
+
+sudo ufw enable
+sudo ufw reload
+
+echo "[+] Firewall configured"

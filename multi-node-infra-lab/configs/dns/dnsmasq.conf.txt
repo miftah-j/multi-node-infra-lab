@@ -1,0 +1,17 @@
+# 🧠 DNS Configuration - dnsmasq
+
+interface=ens33
+bind-interfaces
+listen-address=192.168.100.102
+
+# Internal DNS mappings
+address=/app1.lan/192.168.100.102
+address=/lb1.lan/192.168.100.101
+address=/db1.lan/192.168.100.103
+
+# Upstream DNS (fallback)
+server=8.8.8.8
+server=1.1.1.1
+
+log-queries
+log-facility=/var/log/dnsmasq.log

@@ -1,0 +1,7 @@
+Client Layer
+    ↓
+Load Balancer (101)
+    ↓
+DNS Server (102 - dnsmasq)
+    ↓
+App Server / DB Server
